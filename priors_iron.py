@@ -5,18 +5,18 @@ from scipy.stats import *
 if __name__ == '__main__':
     plt.close('all')
     # plot priors - generate intervals
-    uptake_rate_plot = np.arange(0, 50, 0.1)
-    root2leaf_rate_plot = np.arange(0, 50, 0.1)
-    decay_rate_plot = np.arange(0, 50, 0.5)
-    carrying_capacity = np.arange(0, 12000, 10)
+    uptake_rate_plot = np.arange(0, 1, 0.005)
+    root2leaf_rate_plot = np.arange(0, 1, 0.005)
+    decay_rate_plot = np.arange(0, 1, 0.005)
+    carrying_capacity = np.arange(0, 1000, 10)
     # prior parameters
-    a_r1, b_r1 = 10, .6
-    a_r2, b_r2 = 5, .1
-    a_r3, b_r3 = 10, .5
+    a_r1, b_r1 = 5, .01
+    a_r2, b_r2 = 5, .001
+    a_r3, b_r3 = 5, .01
     p_uptake_r = sp.stats.gamma.pdf(uptake_rate_plot,a=a_r1, loc=0, scale=b_r1)
     p_decay_r = sp.stats.gamma.pdf(decay_rate_plot,a=a_r2, loc=0, scale=b_r2)
     p_r2l_r = sp.stats.gamma.pdf(root2leaf_rate_plot,a=a_r3, loc=0, scale=b_r3)
-    p_carryig_capacity = sp.stats.uniform.pdf(carrying_capacity, loc=400, scale=10000)
+    p_carryig_capacity = sp.stats.uniform.pdf(carrying_capacity, loc=1, scale=1000)
 
     # plots
     fig, axes = plt.subplots(2,2, figsize=(10, 7))
@@ -112,11 +112,11 @@ if __name__ == '__main__':
     nu_min = 0
     nu_range = 0.002
     # # sampling from priors with selected hyper-parameters
-    sampleSize = 100
+    sampleSize = 1000
     sample_ur = sp.stats.gamma.rvs(size=sampleSize,a=a_r1, loc=0, scale=b_r1)
     sample_dr = sp.stats.gamma.rvs(size=sampleSize,a=a_r2, loc=0, scale=b_r2)
     sample_rlr = sp.stats.gamma.rvs(size=sampleSize,a=a_r3, loc=0, scale=b_r3)
-    sample_cc = sp.stats.uniform.rvs(size=sampleSize, loc=400, scale=10000)
+    sample_cc = sp.stats.uniform.rvs(size=sampleSize, loc=1, scale=1000)
 
     # plot sample histograms
     fig, axes = plt.subplots(2,2, figsize=(10, 7))
@@ -133,12 +133,12 @@ if __name__ == '__main__':
     axes.flatten()[2].legend(loc='best', fontsize=14)
     axes.flatten()[2].set_xlabel("rate to leaf rate")
     axes.flatten()[3].hist(sample_cc,density=True,histtype='step',label='Histogram')
-    axes.flatten()[3].scatter(sample_cc, sp.stats.uniform.pdf(sample_cc, loc=400, scale=10000), color='#ff7f0e', lw=0.5, label="$p(carrying capacity)$")
+    axes.flatten()[3].scatter(sample_cc, sp.stats.uniform.pdf(sample_cc, loc=1, scale=1000), color='#ff7f0e', lw=0.5, label="$p(carrying capacity)$")
     axes.flatten()[3].legend(loc='best', fontsize=14)
     axes.flatten()[3].set_xlabel("carrying capacity")
     fig.suptitle('Samples for unknown parameters',fontsize=14)
     fig.tight_layout(pad=1.0)
-    plt.savefig('Valeria_sampled_priors.png')
+    plt.savefig('priors_evaluated_at_sampling_points.png')
     plt.show()
 
     # # save sample

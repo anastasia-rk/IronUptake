@@ -15,16 +15,15 @@ def ode_iron_leaf_root(x, t, params):
     # rate of uptake from matrix to roots, r_mr
     # rate of uptake from roots to leaves, r_rl
     # rate of decay, r_d
-    # carrying capacity of the root matrix, c_max
-    # the scaling parameter characterising fe content in the root matrix, fe_matrix_scale
-    r_mr, r_rl, r_d, c_max = params
+    # carrying capacity of the root matrix scaled by the matrix weight, c_max
+    r_mr, r_rl, r_d, c_min = params
     # the updated states are passed as x
     fe_root, fe_leaf = x
     # get the values of dry weight and matrix concentration from the approximating functions
     dr_w = dry_weight(t)
     fe_in_m = matrix_content(t)
-    matrix_weight = 30 #matrix weight in grmms to bring everything to the same measurement units
-    dxdt = [(r_mr*dr_w*(fe_in_m/matrix_weight))/(c_max - (fe_in_m/matrix_weight)) - r_rl * fe_root - r_d * fe_root, \
+    # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+    dxdt = [(r_mr*dr_w*fe_in_m)/(c_min + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
             r_rl * fe_root - r_d * fe_leaf]
     return dxdt
 
@@ -49,30 +48,27 @@ if __name__ == '__main__':
     df_fe = df_plants[Iron].copy()
     del df_plants
     # average the iron in matrix across replicates -- we need it as a single input
-    times = np.linspace(0, 25, 251)
+    times = np.linspace(0, 21, 211)
     SamplingDays = [0, 2, 4, 7, 9, 11, 14, 16, 18, 21]
     # we need indeces that correspond to sampling days to select only those points for likelihood
     SamplingIndeces = [i for i, e in enumerate(times) if e in SamplingDays]
     # dry weight and cobtent in perlite are averaged across replicates
     # can also try running the model for each dw series as an alternative
     df_matrix = df_matrix.groupby(['Day']).mean()
-    df_dw = df_dw.groupby(['Day']).mean()
+    df_dw = df_dw.loc[(df_fe['Part'] == 'R'), :].groupby(['Day']).mean()
     ###################################################################################################################
     # Analysis 1: extract all MCMC outputs for individual experiments and compare posteriors
     # create measurement vectors and input vectors to be used in the model
     Replicates = df_fe.BioRep.unique()
-    Parts = df_fe.Part.unique()
+    Parts = np.flip(df_fe.Part.unique())
     # Extract measurements for one experiment and fit a model to it
-    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", "$c_{max}$"]
-    labels_simple = ['Sigma','r_m2r','r_r2l','r_d','c_max']
+    # labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", "$c_{max}$", '$w_{matrix}$']
+    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", "$c_{min}$", "$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
+    labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$','$r_d$','$c_{min}$','Fe_{0}(R)','Fe_{0}(L)']
     posteriors = dict.fromkeys(labels_simple)
     for iExperiment in range(nExperiments):
         Experiment = df_fe.columns[iExperiment]
         y_fe = dict.fromkeys(Replicates)
-        iron_0 = []
-        for _, Pt in enumerate(Parts):
-            init_val_kg = df_fe.loc[((df_fe['Part'] == Pt) & (df_fe['Day'] == 'D0')), Experiment].mean()
-            iron_0.append(init_val_kg/1000)
         # create measurments of fe in plant parts for all replicates
         for _, Rep in enumerate(Replicates):
             # create a measurement matrix
@@ -82,10 +78,10 @@ if __name__ == '__main__':
                 list_y.append(y)
             y_fe[Rep] = np.stack(tuple(list_y))
         # create an interpolator for the dry weight and iron content in the matrix
-        dry_weight = sp.interpolate.interp1d(SamplingIndeces, df_dw.iloc[:, iExperiment].values)
-        matrix_content = sp.interpolate.interp1d(SamplingIndeces, df_matrix.iloc[:, iExperiment].values)
+        dry_weight = sp.interpolate.interp1d(SamplingIndeces, df_dw.iloc[:, iExperiment].values,  fill_value='extrapolate')
+        matrix_content = sp.interpolate.interp1d(SamplingIndeces, df_matrix.iloc[:, iExperiment].values,  fill_value='extrapolate')
         ###################################################################################################################
-        fileName = "MCMC_iron_experiment"+str(iExperiment)+".h5"
+        fileName = "../IronMCMCwalkers/MCMC_iron_experiment"+str(iExperiment)+".h5"
         sampler = emcee.backends.HDFBackend(fileName)
         samples = sampler.get_chain()
         # plot the walkers paths
@@ -126,19 +122,20 @@ if __name__ == '__main__':
         # plot model output and compare to experimental values:
         fig, axes = plt.subplots(len(Parts), figsize=(10, 7), sharex=True)
         inds = np.random.randint(len(flat_samples), size=100)
-        y_mean = odeint(ode_iron_leaf_root, iron_0, times, args=(mean_empirical[1:],))
+        y_mean = odeint(ode_iron_leaf_root,  mean_empirical[-2:], times, args=(mean_empirical[1:-2],))
         for ind in inds:
             sample = flat_samples[ind]
-            y_mcmc = odeint(ode_iron_leaf_root, iron_0, times, args=(sample[1:],))
+            y_mcmc = odeint(ode_iron_leaf_root, sample[-2:], times, args=(sample[1:-2],))
             for iPart in range(len(Parts)):
                 axes.flatten()[iPart].plot(times, y_mcmc[:, iPart],color='#1f77b4', alpha=0.1)
         for iPart in range(len(Parts)):
             axes.flatten()[iPart].plot(times, y_mean[:, iPart], color='#ff7f0e', label="MCMC mean")
             for _, Rep in enumerate(Replicates):
-                axes.flatten()[iPart].plot(SamplingDays, y_fe[Rep][iPart, :], marker='o', markersize=2, label='Measured')
+                labelRep = 'Replicate ' + Rep
+                axes.flatten()[iPart].plot(SamplingDays, y_fe[Rep][iPart, :], marker='o', markersize=2, label=labelRep)
             axes.flatten()[iPart].legend(fontsize=10)
             axes.flatten()[iPart].set_xlabel("time, days")
-            axes.flatten()[iPart].set_ylabel("Fe, mg/kg")
+            axes.flatten()[iPart].set_ylabel("Fe in "+ Parts[iPart] +", mg/g")
         plt.tight_layout()
         figName = 'Figures/Model_output_exp_'+str(iExperiment)+'.png'
         plt.savefig(figName)

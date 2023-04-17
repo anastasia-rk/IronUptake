@@ -17,9 +17,9 @@ def log_posterior(theta, times):
 
 def log_prior(theta):
     # no matrix weight
-    sigma2, r_mr, r_rl, r_d, c_min, *iron_0 = theta
+    sigma2, r_mr, r_rl, r_d, *iron_0 = theta
     # everything that is defined in the conditions after the first one corresponds to uniform priors
-    if all(c >= 0 for c in theta) and (c_min < 4):
+    if all(c >= 0 for c in theta):
         a_r1, b_r1 = 5, .01
         a_r2, b_r2 = 5, .001
         a_r3, b_r3 = 5, .01
@@ -40,7 +40,7 @@ def log_likelihood(theta, times):
     sigma2, *model_params = theta
     Sigma = sigma2 * np.identity(2)
     *ode_params, iron_r, iron_l = model_params
-    model_output = odeint(ode_iron_leaf_root, [iron_r, iron_l], times, args=(ode_params,), rtol=0.000001,atol=0.000001)
+    model_output = odeint(ode_iron_no_c_min, [iron_r, iron_l], times, args=(ode_params,), rtol=0.000001,atol=0.000001)
     # compute likelihood for all replicates
     logl_all = 0
     for _, Rep in enumerate(Replicates):
@@ -61,10 +61,27 @@ def ode_iron_leaf_root(x, t, params):
     # the updated states are passed as x
     fe_root, fe_leaf = x
     # get the values of dry weight and matrix concentration from the approximating functions
-    dr_w = dry_weight(t)
+    dr_w = dry_weight_root(t)
     fe_in_m = matrix_content(t)
     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
     dxdt = [(r_mr*dr_w*fe_in_m)/(c_min + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
+            r_rl * fe_root - r_d * fe_leaf]
+    return dxdt
+
+def ode_iron_no_c_min(x, t, params):
+    # the models takes as an input:
+    # rate of uptake from matrix to roots, r_mr
+    # rate of uptake from roots to leaves, r_rl
+    # rate of decay, r_d
+    # carrying capacity of the root matrix scaled by the matrix weight, c_max
+    r_mr, r_rl, r_d = params
+    # the updated states are passed as x
+    fe_root, fe_leaf = x
+    # get the values of dry weight and matrix concentration from the approximating functions
+    dr_w = dry_weight_root(t)
+    fe_in_m = matrix_content(t)
+    # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+    dxdt = [r_mr*dr_w*fe_in_m - r_rl * fe_root - r_d * fe_root, \
             r_rl * fe_root - r_d * fe_leaf]
     return dxdt
 
@@ -94,7 +111,8 @@ if __name__ == '__main__':
     # dry weight and cobtent in perlite are averaged across replicates
     # can also try running the model for each dw series as an alternative
     df_matrix = df_matrix.groupby(['Day']).mean()
-    df_dw = df_dw.loc[(df_fe['Part'] == 'R'),:].groupby(['Day']).mean()
+    df_dw_r = df_dw.loc[(df_fe['Part'] == 'R'), :].groupby(['Day']).mean()
+    df_dw_l = df_dw.loc[(df_fe['Part'] == 'L'), :].groupby(['Day']).mean()
     ###################################################################################################################
     # Analysis 1: fit the model to each experiment individually, compare posteriors among the models
      # create measurement vectors and input vectors to be used in the model
@@ -110,13 +128,17 @@ if __name__ == '__main__':
         iron_0_true.append(init_val_kg / 1000)
         # create measurments of fe in plant parts for all replicates
     # create an interpolator for the dry weight and iron content in the matrix
-    dry_weight = sp.interpolate.interp1d(SamplingIndeces, df_dw.iloc[:,iExperiment].values, fill_value='extrapolate')
+    dry_weight_root = sp.interpolate.interp1d(SamplingIndeces, df_dw_r.iloc[:,iExperiment].values, fill_value='extrapolate')
+    dry_weight_leaf = sp.interpolate.interp1d(SamplingIndeces, df_dw_r.iloc[:, iExperiment].values,
+                                              fill_value='extrapolate')
+    dry_weight_leaf_rapid = dry_weight_leaf(times)
+    rate_change_leaf = sp
     matrix_content = sp.interpolate.interp1d(SamplingIndeces, df_matrix.iloc[:,iExperiment].values,  fill_value='extrapolate')
-    true_params = [0.01, 0.009, 0.0008, 1.5]
-    sig2_true = 0.00001
+    true_params = [0.09, 0.009, 0.0008]
+    sig2_true = 0.001
     # r_mr, r_rl, r_d, c_max, matrix_weight
     # make sure to run the model with the same time step - rates will depend on that
-    y_test = odeint(ode_iron_leaf_root, iron_0_true, times, args=(true_params,),rtol=0.000001,atol=0.000001)
+    y_test = odeint(ode_iron_no_c_min, iron_0_true, times, args=(true_params,),rtol=0.000001,atol=0.000001)
     for _, Rep in enumerate(Replicates):
         # create a measurement matrix
         y_noisy = y_test[SamplingIndeces,:] + np.random.multivariate_normal(mean=[0,0], cov=[[sig2_true, 0],[0, sig2_true]], size=len(SamplingDays))
@@ -137,8 +159,8 @@ if __name__ == '__main__':
     # run EMCMC for sets of walkers sampled around these values
     # test the model: sigma2 + 3 rates + carrying capacity + initial conditions
     sig2 = .01
-    params_0 = [sig2] + [.002, .002, .0001, 0.5] + iron_0_true
-    sigma_vector = np.array([0.001, 0.00001, 0.00001, 0.000001, .01, .01, 0.001])
+    params_0 = [sig2] + [.002, .002, .0001] + iron_0_true
+    sigma_vector = np.array([0.001, 0.00001, 0.00001, 0.000001, .01, 0.001])
     covar = np.identity(len(params_0)) * sigma_vector # create the matrix with diagonal elements defined by sigma_vector
     ndim = len(params_0)
     nwalkers = ndim * 2
@@ -148,7 +170,7 @@ if __name__ == '__main__':
     backend = emcee.backends.HDFBackend(fileName)
     backend.reset(nwalkers, ndim)
     # Prepare placeholders for checking autocorrelation time
-    max_iter = 20000
+    max_iter = 100000
     index_tau = 0
     autocorr = np.empty(max_iter)
     old_tau = np.inf
@@ -175,7 +197,7 @@ if __name__ == '__main__':
     # plot outcome
     # fileName = "../IronMCMCwalkers/MCMC_test.h5"
     # sampler = emcee.backends.HDFBackend(fileName)
-    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", "$c_{min}$","$Fe_{0}(root)$","$Fe_{0}(leaf)$"]
+    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$","$Fe_{0}(root)$","$Fe_{0}(leaf)$"]
     samples = sampler.get_chain()
     # plot the walkers paths
     fig, axes = plt.subplots(len(labels), figsize=(10, 7), sharex=True)
@@ -218,10 +240,10 @@ if __name__ == '__main__':
     # plot model output and compare to experimental values:
     fig, axes = plt.subplots(len(Parts), figsize=(10, 7), sharex=True)
     inds = np.random.randint(len(flat_samples), size=100)
-    y_mean = odeint(ode_iron_leaf_root, mean_empirical[-2:], times, args=(mean_empirical[1:-2],))
+    y_mean = odeint(ode_iron_no_c_min, mean_empirical[-2:], times, args=(mean_empirical[1:-2],))
     for ind in inds:
         sample = flat_samples[ind]
-        y_mcmc = odeint(ode_iron_leaf_root, sample[-2:], times, args=(sample[1:-2],))
+        y_mcmc = odeint(ode_iron_no_c_min, sample[-2:], times, args=(sample[1:-2],))
         for iPart in range(len(Parts)):
             axes.flatten()[iPart].plot(times, y_mcmc[:, iPart], color='#1f77b4', alpha=0.1)
     for iPart in range(len(Parts)):

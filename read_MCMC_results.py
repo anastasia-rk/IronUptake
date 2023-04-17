@@ -27,6 +27,23 @@ def ode_iron_leaf_root(x, t, params):
             r_rl * fe_root - r_d * fe_leaf]
     return dxdt
 
+def ode_iron_leaf_root(x, t, params):
+    # the models takes as an input:
+    # rate of uptake from matrix to roots, r_mr
+    # rate of uptake from roots to leaves, r_rl
+    # rate of decay, r_d
+    # carrying capacity of the root matrix scaled by the matrix weight, c_max
+    r_mr, r_rl, r_d, c_min = params
+    # the updated states are passed as x
+    fe_root, fe_leaf = x
+    # get the values of dry weight and matrix concentration from the approximating functions
+    dr_w = dry_weight(t)
+    fe_in_m = matrix_content(t)
+    # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+    dxdt = [(r_mr*dr_w*fe_in_m)/(c_min + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
+            r_rl * fe_root - r_d * fe_leaf]
+    return dxdt
+
 # Main
 if __name__ == '__main__':
     # enter for how many experiments to run EMCMC

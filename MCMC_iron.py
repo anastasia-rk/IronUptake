@@ -34,9 +34,9 @@ def log_posterior(theta, times):
 
 def log_prior(theta):
     # no matrix weight
-    sigma2, r_mr, r_rl, c_min, *iron_0 = theta
+    sigma2, r_mr, r_rl, *iron_0 = theta
     # everything that is defined in the conditions after the first one corresponds to uniform priors
-    if all(c >= 0 for c in theta) and (0 < c_min < 10):
+    if all(c >= 0 for c in theta):
         a_r1, b_r1 = 5, .01
         a_r2, b_r2 = 5, .001
         a_r3, b_r3 = 5, .01
@@ -62,7 +62,9 @@ def log_likelihood(theta, times):
     for _, Rep in enumerate(Replicates):
         y = y_fe[Rep].copy()
         d_y = np.transpose(model_output)[:,SamplingIndeces] - y # make sure dimensions match
-        logl_all -= 0.5 * (np.trace(np.transpose(d_y) @ np.linalg.inv(Sigma) @ d_y) + len(times) * np.linalg.det(Sigma))
+        # logl_all -= 0.5 * (np.trace(np.transpose(d_y) @ np.linalg.inv(Sigma) @ d_y) + len(times) * np.linalg.det(Sigma))
+        for iTime in range(len(SamplingIndeces)):
+            logl_all += sp.stats.multivariate_normal.logpdf(d_y[:,iTime], mean=None, cov=Sigma, allow_singular=False)
     if math.isnan(logl_all):
         logl_all = -np.inf
     return  logl_all
@@ -73,7 +75,7 @@ def ode_iron_leaf_root(x, t, params):
     # rate of uptake from roots to leaves, r_rl
     # rate of decay, r_d
     # carrying capacity of the root matrix scaled by the matrix weight, c_max
-    r_mr, r_rl, c_min = params
+    r_mr, r_rl = params
     # the updated states are passed as x
     fe_root, fe_leaf = x
     # get the values of dry weight and matrix concentration from the approximating functions
@@ -82,7 +84,7 @@ def ode_iron_leaf_root(x, t, params):
     r_dec_r = rate_decay_r(t)/1000 # increase in weight of roots in kg
     r_dec_l = rate_decay_l(t)/1000 # increase in weight of leafs in kg
     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
-    dxdt = [(r_mr*dr_w*fe_in_m)/(c_min - fe_in_m) - r_rl * fe_root - r_dec_r * fe_root, \
+    dxdt = [(r_mr*dr_w*fe_in_m) - r_rl * fe_root - r_dec_r * fe_root, \
             r_rl * fe_root - r_dec_l * fe_leaf]
     return dxdt
 
@@ -106,7 +108,7 @@ def ode_iron_leaf_root(x, t, params):
 # Main
 if __name__ == '__main__':
     # enter for how many experiments to run EMCMC
-    nExperiments = 7
+    nExperiments = 1
     # read the iron data here
     # extract the data
     # extract sample ids and locations
@@ -158,6 +160,7 @@ if __name__ == '__main__':
                 y = df_fe.loc[((df_fe['Part'] == Pt) & (df_fe['BioRep'] == Rep)),Experiment].values/1000
                 list_y.append(y)
             y_fe[Rep] = np.stack(tuple(list_y))
+            print(y_fe[Rep])
         # create an interpolator for the dry weight and iron content in the matrix
         dry_weight = sp.interpolate.interp1d(SamplingIndeces, df_dw_r.iloc[:,iExperiment].values, fill_value='extrapolate')
         matrix_content = sp.interpolate.interp1d(SamplingIndeces, df_matrix.iloc[:,iExperiment].values,  fill_value='extrapolate')
@@ -167,9 +170,9 @@ if __name__ == '__main__':
         ###################################################################################################################
         # run EMCMC for sets of walkers sampled around these values
         # test the model: sigma2 + 3 rates + carrying capacity + initial conditions
-        sig2 = .01
-        params_0 = [sig2] + [.002, .002, 4.5] + iron_0_true
-        sigma_vector = np.array([0.001, 0.00001, 0.00001, .01, .01, 0.001])
+        sig2 = .1
+        params_0 = [sig2] + [.001, .001] + iron_0_true
+        sigma_vector = np.array([0.0001, 0.00001, 0.00001, .01, 0.001])
         covar = np.identity(len(params_0)) * sigma_vector  # create the matrix with diagonal elements defined by sigma_vector
         ndim = len(params_0)
         nwalkers = ndim * 2
@@ -186,7 +189,7 @@ if __name__ == '__main__':
         # set up a parallel pool to run MCMC
         ncpu = cpu_count()
         ncores = 8
-        print("{0} CPUs".format(ncpu))
+        # print("{0} CPUs".format(ncpu))
         with mp.get_context('fork').Pool(processes=min(ncores, ncpu)) as pool:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, log_posterior, args=(times,), pool=pool, backend=backend)
             for sample in sampler.sample(initial_walker_position, iterations=max_iter, progress=True, store=True):

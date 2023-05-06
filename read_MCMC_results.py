@@ -9,59 +9,133 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
     "font.sans-serif": ["Helvetica"]})
-# Definitions
+
+# Definitions:
+########################################################################################################################
+# models:
+
+# # no inhibition:
+# def ode_iron_leaf_root(x, t, params):
+#     # the models takes as an input:
+#     # rate of uptake from matrix to roots, r_mr
+#     # rate of uptake from roots to leaves, r_rl
+#     # rate of decay, r_d
+#     # carrying capacity of the root matrix scaled by the matrix weight, c_max
+#     r_mr, r_rl = params
+#     # the updated states are passed as x
+#     fe_root, fe_leaf = x
+#     # get the values of dry weight and matrix concentration from the approximating functions
+#     dr_w = dry_weight(t) # dry weight should be in g too!
+#     fe_in_m = matrix_content(t) # has to be per g to align the measurement units.
+#     r_dec_r = rate_decay_r(t) # increase in weight of roots in g
+#     r_dec_l = rate_decay_l(t) # increase in weight of leafs in g
+#     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+#     dxdt = [(r_mr*fe_in_m) - r_rl * fe_root - r_dec_r * fe_root, \
+#             r_rl * fe_root - r_dec_l * fe_leaf]
+#     return dxdt
+
+# # max capacity:
+# def ode_iron_leaf_root(x, t, params):
+#     # the models takes as an input:
+#     # rate of uptake from matrix to roots, r_mr
+#     # rate of uptake from roots to leaves, r_rl
+#     # rate of decay, r_d
+#     # carrying capacity of the root matrix scaled by the matrix weight, c_max
+#     r_mr, r_rl, c_max = params
+#     # the updated states are passed as x
+#     fe_root, fe_leaf = x
+#     # get the values of dry weight and matrix concentration from the approximating functions
+#     dr_w = dry_weight(t) # dry weight should be in g too!
+#     fe_in_m = matrix_content(t) # has to be per g to align the measurement units.
+#     r_dec_r = rate_decay_r(t) # increase in weight of roots in g
+#     r_dec_l = rate_decay_l(t) # increase in weight of leafs in g
+#     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+#     dxdt = [(r_mr*dr_w*fe_in_m)*(c_max - fe_root)/c_max - r_rl * fe_root - r_dec_r * fe_root, \
+#             r_rl * fe_root - r_dec_l * fe_leaf]
+#     return dxdt
+
+# # michaelis constant:
+# def ode_iron_leaf_root(x, t, params):
+#     # the models takes as an input:
+#     # rate of uptake from matrix to roots, r_mr
+#     # rate of uptake from roots to leaves, r_rl
+#     # rate of decay, r_d
+#     # carrying capacity of the root matrix scaled by the matrix weight, c_max
+#     r_mr, r_rl, c_min, MMc = params
+#     # the updated states are passed as x
+#     fe_root, fe_leaf = x
+#     # get the values of dry weight and matrix concentration from the approximating functions
+#     dr_w = dry_weight(t)  # dry weight should be in g too!
+#     fe_in_m = matrix_content(t)  # has to be per kg to align the measurement units.
+#     r_dec_r = rate_decay_r(t)  # increase in weight of roots in g
+#     r_dec_l = rate_decay_l(t)  # increase in weight of leafs in g
+#     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
+#     dxdt = [(r_mr*dr_w*(fe_in_m - c_min))/(fe_in_m + MMc - c_min) - r_rl * fe_root - r_dec_r * fe_root, \
+#             r_rl * fe_root - r_dec_l * fe_leaf]
+#     return dxdt
+
+# time-invariant decay rate:
 def ode_iron_leaf_root(x, t, params):
     # the models takes as an input:
     # rate of uptake from matrix to roots, r_mr
     # rate of uptake from roots to leaves, r_rl
     # rate of decay, r_d
     # carrying capacity of the root matrix scaled by the matrix weight, c_max
-    r_mr, r_rl = params
+    r_mr, r_rl, r_d, MMc = params
     # the updated states are passed as x
     fe_root, fe_leaf = x
     # get the values of dry weight and matrix concentration from the approximating functions
-    dr_w = dry_weight(t)/1000 # dry weight should be in kg too!
-    fe_in_m = matrix_content(t)
-    r_dec_r = rate_decay_r(t)/1000 # increase in weight of roots in kg
-    r_dec_l = rate_decay_l(t)/1000 # increase in weight of leafs in kg
+    dr_w = dry_weight(t)   # dry weight should be in g too!
+    fe_in_m = matrix_content(t)  # has to be per g to align the measurement units.
     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
-    dxdt = [(r_mr*dr_w*fe_in_m) - r_rl * fe_root - r_dec_r * fe_root, \
-            r_rl * fe_root - r_dec_l * fe_leaf]
+    dxdt = [(r_mr*dr_w*fe_in_m)/(MMc + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
+            r_rl * fe_root - r_d * fe_leaf]
     return dxdt
+########################################################################################################################
+# autocorr time computation:
+def next_pow_two(n):
+    i = 1
+    while i < n:
+        i = i << 1
+    return i
 
-# def ode_iron_leaf_root(x, t, params):
-#     # the models takes as an input:
-#     # rate of uptake from matrix to roots, r_mr
-#     # rate of uptake from roots to leaves, r_rl
-#     # rate of decay, r_d
-#     # carrying capacity of the root matrix scaled by the matrix weight, c_max
-#     r_mr, r_rl, r_d, c_min = params
-#     # the updated states are passed as x
-#     fe_root, fe_leaf = x
-#     # get the values of dry weight and matrix concentration from the approximating functions
-#     dr_w = dry_weight(t)
-#     fe_in_m = matrix_content(t)
-#     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
-#     dxdt = [(r_mr*dr_w*fe_in_m)/(c_min + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
-#             r_rl * fe_root - r_d * fe_leaf]
-#     return dxdt
-#
-# def ode_iron_leaf_root(x, t, params):
-#     # the models takes as an input:
-#     # rate of uptake from matrix to roots, r_mr
-#     # rate of uptake from roots to leaves, r_rl
-#     # rate of decay, r_d
-#     # carrying capacity of the root matrix scaled by the matrix weight, c_max
-#     r_mr, r_rl, r_d, c_min = params
-#     # the updated states are passed as x
-#     fe_root, fe_leaf = x
-#     # get the values of dry weight and matrix concentration from the approximating functions
-#     dr_w = dry_weight(t)
-#     fe_in_m = matrix_content(t)
-#     # matrix_weight = 10 #matrix weight in gramms to bring everything to the same measurement units
-#     dxdt = [(r_mr*dr_w*fe_in_m)/(c_min + fe_in_m) - r_rl * fe_root - r_d * fe_root, \
-#             r_rl * fe_root - r_d * fe_leaf]
-#     return dxdt
+def autocorr_func_1d(x, norm=True):
+    x = np.atleast_1d(x)
+    if len(x.shape) != 1:
+        raise ValueError("invalid dimensions for 1D autocorrelation function")
+    n = next_pow_two(len(x))
+    # Compute the FFT and then (from that) the auto-correlation function
+    f = np.fft.fft(x - np.mean(x), n=2 * n)
+    acf = np.fft.ifft(f * np.conjugate(f))[: len(x)].real
+    acf /= 4 * n
+    # Optionally normalize
+    if norm:
+        acf /= acf[0]
+    return acf
+
+# Automated windowing procedure following Sokal (1989)
+def auto_window(taus, c):
+    m = np.arange(len(taus)) < c * taus
+    if np.any(m):
+        return np.argmin(m)
+    return len(taus) - 1
+
+# Following the suggestion from Goodman & Weare (2010)
+def autocorr_gw2010(y, c=5.0):
+    f = autocorr_func_1d(np.mean(y, axis=0))
+    taus = 2.0 * np.cumsum(f) - 1.0
+    window = auto_window(taus, c)
+    return taus[window]
+
+
+def autocorr_new(y, c=5.0):
+    f = np.zeros(y.shape[1])
+    for yy in y:
+        f += autocorr_func_1d(yy)
+    f /= len(y)
+    taus = 2.0 * np.cumsum(f) - 1.0
+    window = auto_window(taus, c)
+    return taus[window]
 
 # Main
 if __name__ == '__main__':
@@ -95,15 +169,30 @@ if __name__ == '__main__':
     df_dw_r_diff = df_dw_r.diff() / 2  # beacuse the increase happens over two day time increment
     df_dw_l = df_dw.loc[(df_fe['Part'] == 'L'), :].groupby(['Day']).mean()
     df_dw_l_diff = df_dw_l.diff() / 2  # beacuse the increase happens over two day time increment
+    # create a figure for rates of decay in roots and leaves
+    fig2,axes2 = plt.subplots(2,1,sharex=True)
     ###################################################################################################################
     # Analysis 1: extract all MCMC outputs for individual experiments and compare posteriors
     # create measurement vectors and input vectors to be used in the model
     Replicates = df_fe.BioRep.unique()
     Parts = np.flip(df_fe.Part.unique())
     # Extract measurements for one experiment and fit a model to it
-    # labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", "$c_{max}$", '$w_{matrix}$']
-    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
-    labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$', 'Fe_{0}(R)','Fe_{0}(L)']
+    # # Model 4 - no inhibition
+    # labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$","$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
+    # labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$', 'Fe_{0}(R)','Fe_{0}(L)']
+    # # Model 3 - max capacity of roots
+    # labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", '$c_{max}$',"$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
+    # labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$', '$c_{max}$', 'Fe_{0}(R)','Fe_{0}(L)']
+    # # Model 2 - min cocentration in matrix & MM constant
+    # labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$",'$c_{max}$', '$MM const$',"$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
+    # labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$','$c_{max}$', 'MM const', 'Fe_{0}(R)','Fe_{0}(L)']
+    # Model 1 -  const decay rate
+    labels = ["$\sigma^2$", "$rate_{m2r}$", "$rate_{r2l}$", "$rate_{decay}$", 'MM const',"$Fe_{0}(root)$", "$Fe_{0}(leaf)$"]
+    labels_simple = ['$\sigma^2$','$r_m2r$','$r_r2l$', "$r_{decay}$", 'MM const', 'Fe_{0}(R)','Fe_{0}(L)']
+    # create dataframes to store posterior properties
+    dfs = []
+    for iParam in range(len(labels)):
+        dfs.append(pd.DataFrame(columns=['Experiment', 'Mean', 'Variance', 'Skewness', 'Kurtosis']))
     posteriors = dict.fromkeys(labels_simple)
     for iExperiment in range(nExperiments):
         Experiment = df_fe.columns[iExperiment]
@@ -117,16 +206,51 @@ if __name__ == '__main__':
                 list_y.append(y)
             y_fe[Rep] = np.stack(tuple(list_y))
         # create an interpolator for the dry weight and iron content in the matrix
-        dry_weight = sp.interpolate.interp1d(SamplingIndeces, df_dw_r.iloc[:, iExperiment].values,  fill_value='extrapolate')
-        matrix_content = sp.interpolate.interp1d(SamplingIndeces, df_matrix.iloc[:, iExperiment].values,  fill_value='extrapolate')
-        rate_decay_r = sp.interpolate.interp1d(SamplingIndeces[1:], df_dw_r_diff.iloc[1:, iExperiment].values,
-                                               fill_value='extrapolate')
-        rate_decay_l = sp.interpolate.interp1d(SamplingIndeces[1:], df_dw_l_diff.iloc[1:, iExperiment].values,
-                                               fill_value='extrapolate')
+        dry_weight = sp.interpolate.interp1d(SamplingDays, df_dw_r.iloc[:, iExperiment].values,  fill_value='extrapolate')
+        matrix_content = sp.interpolate.interp1d(SamplingDays, df_matrix.iloc[:, iExperiment].values,  fill_value='extrapolate')
+        rate_decay_r = sp.interpolate.interp1d(SamplingDays[1:], df_dw_r_diff.iloc[1:, iExperiment].values,
+                                               kind='cubic',
+                                               fill_value=(
+                                               df_dw_r_diff.iloc[1, iExperiment], df_dw_r_diff.iloc[-1, iExperiment]),
+                                               bounds_error=False)
+        rate_decay_l = sp.interpolate.interp1d(SamplingDays[1:], df_dw_l_diff.iloc[1:, iExperiment].values,
+                                               fill_value=(
+                                               df_dw_l_diff.iloc[1, iExperiment], df_dw_l_diff.iloc[-1, iExperiment]), \
+                                               kind='cubic', bounds_error=False)
         ###################################################################################################################
         fileName = "../IronMCMCwalkers/MCMC_iron_experiment"+str(iExperiment)+".h5"
         sampler = emcee.backends.HDFBackend(fileName)
         samples = sampler.get_chain()
+        # # see how autocorrelation time changes
+        # N = np.exp(np.linspace(np.log(1000), np.log(samples.shape[0]), 10)).astype(int)
+        # gw2010 = np.empty((samples.shape[2],len(N)))
+        # new = np.empty((samples.shape[2],len(N)))
+        # for iSample, n in enumerate(N):
+        #     for iParam in range(samples.shape[2]):
+        #         gw2010[iParam,iSample] = autocorr_gw2010(samples[:n, :, iParam])
+        #         new[iParam,iSample] = autocorr_new(samples[:n, :, iParam])
+        # # Plot the comparisons
+        # fig,axes = plt.subplots(3,2)
+        # for iParam in range(samples.shape[0]):
+        #     ax = axes.flatten()[iParam]
+        #     ax.loglog(N, gw2010[iParam,:], "o-", label="G&W 2010")
+        #     ax.loglog(N, new[iParam,:], "o-", label="new")
+        #     ylim = plt.gca().get_ylim()
+        #     ax.plot(N, N / 50.0, "--k", label=r"$\tau = N/50$")
+        #     ax.set_ylim(ylim)
+        #     ax.set_xlabel("number of samples, $N$")
+        #     ax.set_ylabel(r"$\tau$ estimates")
+        #     ax.legend(fontsize=14)
+        #     ax.set_title(labels[iParam])
+        # plt.tight_layout()
+        # figName = 'Figures/mcmc_autocor_times_' + str(iExperiment) + '.png'
+        # plt.savefig(figName)
+        ################################################################################################################
+        # flatten the chain
+        tau = sampler.get_autocorr_time(tol=0)
+        print("tau: {0}".format(tau))
+        burnin = int(2 * np.max(tau))
+        thin = max(1,int(0.5 * np.min(tau)))
         # plot the walkers paths
         fig, axes = plt.subplots(len(labels), figsize=(10, 7), sharex=True)
         for iParam in range(len(labels)):
@@ -134,15 +258,12 @@ if __name__ == '__main__':
             ax.plot(samples[:, :, iParam], alpha=0.3)
             ax.set_xlim(0, len(samples))
             ax.set_ylabel(labels[iParam])
+            ax.text(0.99, 0.85, r'$\tau=$' + "{:.2f}".format(tau[iParam]), horizontalalignment='right',
+                    transform=ax.transAxes, fontsize=10)
         axes[-1].set_xlabel("step number")
         plt.tight_layout()
-        figName = 'Figures/shed_mcmc_walkers_exp_'+str(iExperiment)+'.png'
+        figName = 'Figures/mcmc_walkers_exp_' + str(iExperiment+1) + '.png'
         plt.savefig(figName)
-        # flatten the sample
-        tau = sampler.get_autocorr_time(tol=0)
-        print("tau: {0}".format(tau))
-        burnin = int(2 * np.max(tau))
-        thin = int(0.5 * np.min(tau))
         flat_samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
         log_prob_samples = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)
         log_prior_samples = sampler.get_blobs(discard=burnin, flat=True, thin=thin)
@@ -152,15 +273,16 @@ if __name__ == '__main__':
         print("flat log prob shape: {0}".format(log_prob_samples.shape))
         # build corner plot for each experiment
         import matplotlib.lines as mlines
-        mean_line = mlines.Line2D([], [], color='#2ca02c', label='Mean')
+        mean_line = mlines.Line2D([], [], color='#2ca02c', label='Empirical mean')
+        dummyline = mlines.Line2D([], [], color='k', linestyle='--', label='16 and 84 percentiles')
         mean_empirical = np.mean(flat_samples, axis=0)
         fig = corner.corner(
             flat_samples, labels=labels,
-            quantiles=[0.16, 0.84], show_titles=True, title_kwargs={"fontsize": 10}, title_fmt='.4f')
+            quantiles=[0.16, 0.84], show_titles=True, title_quantiles=None, title_kwargs={"fontsize": 10}, title_fmt='.4f')
         corner.overplot_lines(fig, mean_empirical, color='#2ca02c')
         corner.overplot_points(fig, mean_empirical[None], marker="s", color="#2ca02c")
-        plt.legend(handles=[mean_line], bbox_to_anchor=(0., 1.15, 1., .0), loc=8)
-        figName = 'Figures/mcmc_corner_exp_'+str(iExperiment)+'.png'
+        plt.legend(handles=[mean_line,dummyline], bbox_to_anchor=(0., 1.15, 1., .0), loc=8)
+        figName = 'Figures/mcmc_corner_exp_'+str(iExperiment+1)+'.png'
         plt.savefig(figName)
         # plot model output and compare to experimental values:
         fig, axes = plt.subplots(len(Parts), figsize=(10, 7), sharex=True)
@@ -176,11 +298,26 @@ if __name__ == '__main__':
             for _, Rep in enumerate(Replicates):
                 labelRep = 'Replicate ' + Rep
                 axes.flatten()[iPart].plot(SamplingDays, y_fe[Rep][iPart, :], marker='o', markersize=2, label=labelRep)
-            axes.flatten()[iPart].legend(fontsize=10)
-            axes.flatten()[iPart].set_xlabel("time, days")
+            axes.flatten()[iPart].legend( ncol=2, fontsize=10)
             axes.flatten()[iPart].set_ylabel("Fe in "+ Parts[iPart] +", mg/g")
+        axes.flatten()[-1].set_xlabel("Time, days")
         plt.tight_layout()
-        figName = 'Figures/Model_output_exp_'+str(iExperiment)+'.png'
+        figName = 'Figures/Model_output_exp_'+str(iExperiment+1)+'.png'
         plt.savefig(figName)
         ################################################################################################################
+#         compute summary statistics of each posterior distribution
+        variance = np.var(flat_samples, axis=0)
+        skewness = sp.stats.skew(flat_samples, axis=0, bias=True)
+        kurtosis = sp.stats.kurtosis(flat_samples, axis=0, bias=True)
+        for iParam in range(len(labels)):
+            df_row = df1 = pd.DataFrame({"Experiment": [iExperiment+1],"Mean": [mean_empirical[iParam]],"Variance":[variance[iParam]],\
+                                         "Skewness":[skewness[iParam]],"Kurtosis":[kurtosis[iParam]]})
+            dfs[iParam] = pd.concat([dfs[iParam], df_row], ignore_index=True)
+    ####################################################################################################################
+    # save tables into a single excel file
+    sheet_labels = ['Sigma squared','Rate of uptake','Rate of transfer','Fe_0 in roots','Fe_0 in leaves']
+    with pd.ExcelWriter('Posteriors.xlsx') as writer:
+        for iParam in range(len(sheet_labels)):
+            dfs[iParam].to_excel(writer, sheet_name=sheet_labels[iParam])
+
 

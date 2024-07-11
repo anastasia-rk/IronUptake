@@ -82,7 +82,7 @@ if __name__ == '__main__':
     # extract sample ids and locations
     xl_all = pd.ExcelFile('iron_data/all_iron_data.xlsx')
     df_plants = xl_all.parse('Iron_in_plants')
-    df_matrix = xl_all.parse('Iron_in_matrix')
+    df_matrix = xl_all.parse('Iron_dose')
     df_plants[["Day", "Part", "BioRep"]] = df_plants['Samples'].str.split('-', expand=True)
     df_matrix[["Day", "BioRep"]] = df_matrix['Samples'].str.split('-M-', expand=True)
     df_plants.drop(['Samples'], axis=1, inplace=True)
@@ -174,8 +174,8 @@ if __name__ == '__main__':
     plt.savefig(figName, dpi=600)
     # save the rates of decay figure
     plt.figure(fig2.number)
-    axes2[0, 0].set_title('In roots')
-    axes2[0, 1].set_title('In leaves')
+    axes2[0, 0].set_title('In roots, g/day')
+    axes2[0, 1].set_title('In leaves, g/day')
     axes2[-1, 0].set_xlabel('Time,days')
     axes2[-1, 1].set_xlabel('Time,days')
     plt.tight_layout(pad=0.5)

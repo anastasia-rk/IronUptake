@@ -116,7 +116,7 @@ if __name__ == '__main__':
     sample_ur = sp.stats.gamma.rvs(size=sampleSize,a=a_r1, loc=0, scale=b_r1)
     sample_dr = sp.stats.gamma.rvs(size=sampleSize,a=a_r2, loc=0, scale=b_r2)
     sample_rlr = sp.stats.gamma.rvs(size=sampleSize,a=a_r3, loc=0, scale=b_r3)
-    sample_cc = sp.stats.uniform.rvs(size=sampleSize, loc=0.01, scale=100)
+    sample_cc = sp.stats.uniform.rvs(size=sampleSize, loc=0.01, scale=30)
 
     # plot sample histograms
     fig, axes = plt.subplots(2,2, figsize=(10, 7))
@@ -133,9 +133,9 @@ if __name__ == '__main__':
     axes.flatten()[2].legend(loc='best', fontsize=14)
     axes.flatten()[2].set_xlabel("rate to leaf rate")
     axes.flatten()[3].hist(sample_cc,density=True,histtype='step',label='Histogram',color='#A020F0')
-    axes.flatten()[3].scatter(sample_cc, sp.stats.uniform.pdf(sample_cc, loc=0.01, scale=100), color='#ff7f0e', s=1, label="$p(Mk)$")
+    axes.flatten()[3].scatter(sample_cc, sp.stats.uniform.pdf(sample_cc, loc=0.01, scale=30), color='#ff7f0e', s=1, label="$p(Mk)$")
     axes.flatten()[3].legend(loc='best', fontsize=14)
-    axes.flatten()[3].set_xlabel("carrying capacity")
+    axes.flatten()[3].set_xlabel("Michaelis-Menten constant")
     fig.tight_layout(pad=1.0)
     plt.savefig('priors_evaluated_at_sampling_points.png')
     plt.show()

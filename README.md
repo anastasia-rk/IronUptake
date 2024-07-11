@@ -1,2 +1,2 @@
 # IronUptake
- Fitting the model of iron uptake in spincah plants.
+ Fitting  models of iron uptake in spincah plants to experimental data via ensemble MCMC>
